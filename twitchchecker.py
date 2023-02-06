@@ -30,7 +30,8 @@ class twitchchecker():
     self.log2_force = False                  # 온전한 log2 파일이 있어도 강제로 검사 (로그 파일이 있더라도 재검사가 필요한 경우는 재검사하니 굳이 건들지 마세요)
     self.loop = False                        # 루프 옵션
     self.loop_delay = 60                     # 루프 딜레이 (loop가 True 이며 files가 1 또는 2 인 경우 해당 딜레이 이후 다시 실행)
-    self.exitmessage = False                 # 검사 종료시 enter 메세지가 뜨게 할지 여부 (로그 파일만 남기는게 목적이라면 False로)
+    self.exitmessage = True                  # 검사 종료시 enter 메세지가 뜨게 할지 여부 (로그 파일만 남기는게 목적이라면 False로)
+    self.utc = 9                             # 시간 기준입니다. 한국은 UTC+9 니다.
     if len(sys.argv)>1: self.loop = False    # sys.argv 가 주어진 경우 loop 옵션을 비활성화 (주석으로 비활성화 가능)
     if self.loop: self.log = 2               # loop 가 활성화 된 경우 log=2 를 활성화 (주석으로 비활성화 가능)
 
@@ -172,7 +173,7 @@ class twitchchecker():
                     logger.debug(f"- 로딩중   : {format(fp.tell(),',')}/{format(size,',')} ({fp.tell()*100/size:.2f}%)\r")
                     regex = re.search("20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}",str(packet))
                     if regex:
-                      timestamp = datetime.datetime.strptime(regex.group(),"%Y-%m-%dT%H:%M:%S")+datetime.timedelta(hours=9)
+                      timestamp = datetime.datetime.strptime(regex.group(),"%Y-%m-%dT%H:%M:%S")+datetime.timedelta(hours=self.utc)
                       segment.append({'index':int(packet[i+6:i+16]),'timestamp':timestamp})
               else:
                 index = list(map(lambda x:x['index'],segment))
