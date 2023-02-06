@@ -2,29 +2,48 @@ import datetime
 import logging
 import os
 import re
+import sys
 import time
 import tkinter.filedialog
 try:
-  import cv2 ## pip install opencv-python
+  import cv2
   cv_module = True
 except ModuleNotFoundError:
   cv_module = False
 
 class twitchchecker():
 
-  def setting(self):
-    self.location_force = ""                 # 강제 위치 지정
-    self.location = 1                        # 0: 실행 위치 # 1: 프로그램 위치
-    self.files = 2                           # 0: GUI # 1: 작업 경로 # 2: 하위 작업 경로 포함
-    self.files_slug = [".ts",".mkv",".mp4"]  # 파일 확장자
-    self.log = 2                             # 0: 출력만 # 1:단일 로그 # 2: 대상 파일별 로그
-    self.log_force = False                   # 로그 강제 갱신
-    self.log1_name = "twitchchecker.txt"     # 단일 로그 파일명 (datetime 포멧 사용가능)
-    self.log1_mode = "wt"                    # 단일 로그 파일 모드 (wt/at)
+  ########## ########## 사용자 설정 ########## ##########
+  def user_setting(self):
+    self.location = 0                        # 0: 실행 위치 # 1: 프로그램 위치
+    self.files = 0                           # 0: GUI # 1: 작업 경로 # 2: 하위 작업 경로 포함 # sys.argv 가 존재한다면 우선 실행
+    self.log = 2                             # 0: 출력만 # 1:단일 로그 # 2: 대상 파일별 로그 (log=2 인 경우, 기존에 온전한 로그파일이 있다면 자동으로 건너뜀)
+    self.log1_name = "twitchchecker.txt"     # 단일 로그 파일명 (datetime 포멧을 사용가능, ex: %Y %m %d %H %M %S)
+    self.log1_mode = "wt"                    # 단일 로그 파일 모드 (log1_name 이 정적인 경우 덮어쓸지 이어쓸지 여부, wt: 덮어쓰기 / at: 이어쓰기)
     self.log2_slug = ".txt"                  # 다중 로그 확장자
-    self.loop = False                        # 루프 옵션
-    self.loop_delay = 60                     # 루프 딜레이 (files!=0)
 
+  ########## ########## 고급 설정 (특별한 목적이 있는게 아니라면 그대로 두는걸 권장) ########## ########## 
+  def advanced_setting(self):
+    self.location_force = ""                 # 강제 위치 지정
+    self.files_slug = [".ts"]                # 검사할 파일 확장자
+    self.seg_pass = True                     # 세그먼트 파일 건너뛰기 옵션 (ex. 0.ts, 0-muted.ts, index-0000000000.ts)
+    self.log2_force = False                  # 온전한 log2 파일이 있어도 강제로 검사 (로그 파일이 있더라도 재검사가 필요한 경우는 재검사하니 굳이 건들지 마세요)
+    self.loop = False                        # 루프 옵션
+    self.loop_delay = 60                     # 루프 딜레이 (loop가 True 이며 files가 1 또는 2 인 경우 해당 딜레이 이후 다시 실행)
+    if len(sys.argv)>1: self.loop = False    # sys.argv 가 주어진 경우 loop 옵션을 비활성화 (주석으로 비활성화 가능)
+    if self.loop: self.log = 2               # loop 가 활성화 된 경우 log=2 를 활성화 (주석으로 비활성화 가능)
+
+  ########## ########## 참고사항 ########## ##########
+  # 트위치 녹화 파일을 검사하는 프로그램입니다. (version:4.0)
+  # 트위치 메타데이터가 손상되지 않은 원본 상태로 녹화된 ts 파일만 검사할 수 있습니다.
+  # pip install opencv-python 명령어를 이용하여 cv2 모듈을 를 설치하는걸 권장드립니다.
+  # 다만 cv2 모듈 설치에 어려움을 겪는 분들이 있어서 4.0에서는 cv2 모듈을 설치하지 않고도 작동할 수 있도록 수정했습니다.
+  # cv2 모듈이 설치되지 않은 경우 화질 및 프레임 정보를 확인할 수 없으며, 시간과 관련된 정보들이 살짝 다를 수 있습니다.
+  # log=2 옵션으로 이전에 온전히 작성된 로그가 있다면 이후 해당 파일 검사를 건너 뜁니다.
+  # 여기서 온전히 작성된 로그란, 이전에 해당 파일을 검사했을때와 검사 파일 용량이 동일한 경우를 의미합니다.
+  # 프로그램 관련 문의, 버그 제보, 개선 의견 등이 있다면 https://arca.live/b/nxwqwer 문의탭에 작성해주세요.
+
+  ########## ########## 이 아래 부분은 건들지 마세요 ########## ########## 
   def system(self):
     self.dir_execution = os.getcwd()
     self.dir_program = os.path.dirname(__file__)
@@ -36,14 +55,17 @@ class twitchchecker():
       os.system(f"title {message}")
 
   def get_files(self):
-    if self.files==0:
-      return list(tkinter.filedialog.askopenfilenames(initialdir="./",title="파일선택",filetypes=(("filtering"," ".join(map(lambda x:f"*{x}",self.files_slug))),("all files","*.*"))))
+    if len(sys.argv)>1:
+      filenames = list(sys.argv[1:])
+    elif self.files==0:
+      filenames = list(tkinter.filedialog.askopenfilenames(initialdir="./",title="파일선택",filetypes=(("filtering"," ".join(map(lambda x:f"*{x}",self.files_slug))),("all files","*.*"))))
     elif self.files==1:
       filenames = list(filter(lambda a: any(list(map(lambda b:a.endswith(b),self.files_slug))),os.listdir("./")))
     elif self.files==2:
       filenames = sum(list(map(lambda a:list(map(lambda b:os.path.join(a[0],b),list(filter(lambda c:any(map(lambda d:c.endswith(d),self.files_slug)),a[2])))),os.walk("."))),list())
-    filenames = list(filter(lambda x:not re.fullmatch("\d*(-muted)?.ts",x.split("\\")[-1]),filenames))
-    filenames = list(filter(lambda x:not re.fullmatch("index-\d{10}.ts",x.split("\\")[-1]),filenames))
+    if self.seg_pass:
+      filenames = list(filter(lambda x:not re.fullmatch("\d*(-muted)?.ts",x.split("\\")[-1]),filenames))
+      filenames = list(filter(lambda x:not re.fullmatch("index-\d{10}.ts",x.split("\\")[-1]),filenames))
     return filenames
 
   def bind_loss(self,loss):
@@ -77,8 +99,10 @@ class twitchchecker():
       return (width,hight,frame,fps)
 
   def __init__(self):
-    self.setting()
+    self.user_setting()
+    self.advanced_setting()
     self.system()
+    print(os.getcwd())
     if self.location_force:
       os.chdir(self.location_force)
     elif self.location==0:
@@ -107,31 +131,30 @@ class twitchchecker():
         logger.addHandler(file_handler)
       for filename in filenames:
         try:
-          runcounter = time.perf_counter()
+          logname = filename[:filename.rfind(".")]+self.log2_slug
+          if self.log==2:
+            file_handler = logging.FileHandler(logname,"wt","utf8")
+            file_handler.setFormatter(formatter)
+            file_handler.setLevel(logging.INFO)
+            file_handler.terminator = ""
+            logger.addHandler(file_handler)
           with open(filename,"rb") as fp:
             if not re.search("index-\d{10}.ts",str(fp.read(1880))):
               continue
             size = fp.seek(0,2)
-            sizefmt = format(size,",")
-            logname = filename[:filename.rfind(".")]+self.log2_slug
-            if not self.log_force:
+            sizefmt = format(size,',')
+            if not self.log2_force:
               if os.path.isfile(logname):
                 with open(logname,"rt",encoding="utf8") as fp_log:
                   if f"{sizefmt}/{sizefmt} (100.00%)" in fp_log.read():
                     continue
+            runcounter = time.perf_counter()
             self.title(f"[TwitchChecker] {os.path.basename(filename)}")
             fp.seek(0,0)
             segment = []
             index = []
-            location = 0
             error = 0
             timestamp = None
-            if self.log==2:
-              file_handler = logging.FileHandler(logname,"wt","utf8")
-              file_handler.setFormatter(formatter)
-              file_handler.setLevel(logging.INFO)
-              file_handler.terminator = ""
-              logger.addHandler(file_handler)
             logger.info(f"* {os.path.basename(filename)}\n")
             while True:
               packet = fp.read(188)
@@ -148,9 +171,7 @@ class twitchchecker():
                     regex = re.search("20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}",str(packet))
                     if regex:
                       timestamp = datetime.datetime.strptime(regex.group(),"%Y-%m-%dT%H:%M:%S")+datetime.timedelta(hours=9)
-                      segment.append({'index':int(packet[i+6:i+16]),'location':location,'timestamp':timestamp})
-                  elif pid==0:
-                    location = fp.tell()-188
+                      segment.append({'index':int(packet[i+6:i+16]),'timestamp':timestamp})
               else:
                 index = list(map(lambda x:x['index'],segment))
                 loss = [i for i in range(segment[0]['index'],segment[-1]['index']+1) if i not in index]
