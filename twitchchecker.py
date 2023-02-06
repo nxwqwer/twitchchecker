@@ -16,7 +16,7 @@ class twitchchecker():
   ########## ########## 사용자 설정 ########## ##########
   def user_setting(self):
     self.location = 0                        # 0: 실행 위치 # 1: 프로그램 위치
-    self.files = 0                           # 0: GUI # 1: 작업 경로 # 2: 하위 작업 경로 포함 # sys.argv 가 존재한다면 우선 실행
+    self.files = 2                           # 0: GUI # 1: 작업 경로 # 2: 하위 작업 경로 포함 # sys.argv 가 존재한다면 우선 실행
     self.log = 2                             # 0: 출력만 # 1:단일 로그 # 2: 대상 파일별 로그 (log=2 인 경우, 기존에 온전한 로그파일이 있다면 자동으로 건너뜀)
     self.log1_name = "twitchchecker.txt"     # 단일 로그 파일명 (datetime 포멧을 사용가능, ex: %Y %m %d %H %M %S)
     self.log1_mode = "wt"                    # 단일 로그 파일 모드 (log1_name 이 정적인 경우 덮어쓸지 이어쓸지 여부, wt: 덮어쓰기 / at: 이어쓰기)
@@ -24,12 +24,13 @@ class twitchchecker():
 
   ########## ########## 고급 설정 (특별한 목적이 있는게 아니라면 그대로 두는걸 권장) ########## ########## 
   def advanced_setting(self):
-    self.location_force = ""                 # 강제 위치 지정
+    self.location_force = "D://트위치"                 # 강제 위치 지정
     self.files_slug = [".ts"]                # 검사할 파일 확장자
     self.seg_pass = True                     # 세그먼트 파일 건너뛰기 옵션 (ex. 0.ts, 0-muted.ts, index-0000000000.ts)
     self.log2_force = False                  # 온전한 log2 파일이 있어도 강제로 검사 (로그 파일이 있더라도 재검사가 필요한 경우는 재검사하니 굳이 건들지 마세요)
     self.loop = False                        # 루프 옵션
     self.loop_delay = 60                     # 루프 딜레이 (loop가 True 이며 files가 1 또는 2 인 경우 해당 딜레이 이후 다시 실행)
+    self.exitmessage = False                 # 검사 종료시 enter 메세지가 뜨게 할지 여부 (로그 파일만 남기는게 목적이라면 False로)
     if len(sys.argv)>1: self.loop = False    # sys.argv 가 주어진 경우 loop 옵션을 비활성화 (주석으로 비활성화 가능)
     if self.loop: self.log = 2               # loop 가 활성화 된 경우 log=2 를 활성화 (주석으로 비활성화 가능)
 
@@ -130,8 +131,18 @@ class twitchchecker():
         file_handler.terminator = ""
         logger.addHandler(file_handler)
       for filename in filenames:
+        with open(filename,"rb") as fp:
+          if not re.search("index-\d{10}.ts",str(fp.read(1880))):
+            continue
+          size = fp.seek(0,2)
+          sizefmt = format(size,',')
+        logname = filename[:filename.rfind(".")]+self.log2_slug
+        if not self.log2_force and os.path.isfile(logname):
+          with open(logname,"rt",encoding="utf8") as fp_log:
+            fpdata = fp_log.read()
+            if f"{sizefmt}/{sizefmt} (100.00%)" in fpdata or "- 에러발생 : " in fpdata:
+              continue
         try:
-          logname = filename[:filename.rfind(".")]+self.log2_slug
           if self.log==2:
             file_handler = logging.FileHandler(logname,"wt","utf8")
             file_handler.setFormatter(formatter)
@@ -139,18 +150,8 @@ class twitchchecker():
             file_handler.terminator = ""
             logger.addHandler(file_handler)
           with open(filename,"rb") as fp:
-            if not re.search("index-\d{10}.ts",str(fp.read(1880))):
-              continue
-            size = fp.seek(0,2)
-            sizefmt = format(size,',')
-            if not self.log2_force:
-              if os.path.isfile(logname):
-                with open(logname,"rt",encoding="utf8") as fp_log:
-                  if f"{sizefmt}/{sizefmt} (100.00%)" in fp_log.read():
-                    continue
             runcounter = time.perf_counter()
             self.title(f"[TwitchChecker] {os.path.basename(filename)}")
-            fp.seek(0,0)
             segment = []
             index = []
             error = 0
@@ -216,7 +217,8 @@ class twitchchecker():
           logger.debug(f"* 루프 기다리는 중 ({self.loop_delay}초)\n\n")
           time.sleep(self.loop_delay)
       else:
-        input('press enter to exit')
+        if self.exitmessage:
+          input('press enter to exit')
 
 if __name__=="__main__":
   twitchchecker()
