@@ -16,9 +16,9 @@ class twitchchecker():
   ########## ########## 사용자 설정 ########## ##########
   def user_setting(self):
     self.location = 0                        # 0: 실행 위치 # 1: 프로그램 위치
-    self.files = 2                           # 0: GUI # 1: 작업 경로 # 2: 하위 작업 경로 포함 # sys.argv 가 존재한다면 우선 실행
+    self.files = 0                           # 0: GUI # 1: 작업 경로 # 2: 하위 작업 경로 포함 # sys.argv 가 존재한다면 우선 실행
     self.log = 2                             # 0: 출력만 # 1:단일 로그 # 2: 대상 파일별 로그 (log=2 인 경우, 기존에 온전한 로그파일이 있다면 자동으로 건너뜀)
-    self.log1_name = "twitchchecker.txt"     # 단일 로그 파일명 (datetime 포멧을 사용가능, ex: %Y %m %d %H %M %S)
+    self.log1_name = "twitchchecker.txt"     # 단일 로그 파일명 (datetime 포멧을 사용하여 동적인 파일명으로 로깅가능, ex: %Y %m %d %H %M %S)
     self.log1_mode = "wt"                    # 단일 로그 파일 모드 (log1_name 이 정적인 경우 덮어쓸지 이어쓸지 여부, wt: 덮어쓰기 / at: 이어쓰기)
     self.log2_slug = ".txt"                  # 다중 로그 확장자
 
