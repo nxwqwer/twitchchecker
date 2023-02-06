@@ -104,7 +104,6 @@ class twitchchecker():
     self.user_setting()
     self.advanced_setting()
     self.system()
-    print(os.getcwd())
     if self.location_force:
       os.chdir(self.location_force)
     elif self.location==0:
