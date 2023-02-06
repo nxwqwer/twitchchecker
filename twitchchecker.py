@@ -24,7 +24,7 @@ class twitchchecker():
 
   ########## ########## 고급 설정 (특별한 목적이 있는게 아니라면 그대로 두는걸 권장) ########## ########## 
   def advanced_setting(self):
-    self.location_force = "D://트위치"                 # 강제 위치 지정
+    self.location_force = ""                 # 강제 위치 지정
     self.files_slug = [".ts"]                # 검사할 파일 확장자
     self.seg_pass = True                     # 세그먼트 파일 건너뛰기 옵션 (ex. 0.ts, 0-muted.ts, index-0000000000.ts)
     self.log2_force = False                  # 온전한 log2 파일이 있어도 강제로 검사 (로그 파일이 있더라도 재검사가 필요한 경우는 재검사하니 굳이 건들지 마세요)
@@ -140,7 +140,8 @@ class twitchchecker():
         if not self.log2_force and os.path.isfile(logname):
           with open(logname,"rt",encoding="utf8") as fp_log:
             fpdata = fp_log.read()
-            if f"{sizefmt}/{sizefmt} (100.00%)" in fpdata or "- 에러발생 : " in fpdata:
+            if re.search(f"- 로딩완료 : {sizefmt}\/{sizefmt} \(100\.00%\)",fpdata) or re.search(f"- 에러발생 : [\d\,]*\/{sizefmt}",fpdata):
+              logger.debug(f"* [pass] {os.path.basename(filename)} ({sizefmt})\n")
               continue
         try:
           if self.log==2:
