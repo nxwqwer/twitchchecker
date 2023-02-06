@@ -31,7 +31,7 @@ class twitchchecker():
     self.loop = False                             # 루프 옵션
     self.loop_delay = 60                          # 루프 딜레이 (loop가 True 이며 files가 1 또는 2 인 경우 해당 딜레이 이후 다시 실행)
     self.exitmessage = True                       # 검사 종료시 enter 메세지가 뜨게 할지 여부 (로그 파일만 남기는게 목적이라면 False로)
-    self.utc = 9                                  # 시간 기준입니다. 한국은 UTC+9 니다.
+    self.utc = 9                                  # 시간 기준입니다.
     if len(sys.argv)>1: self.loop = False         # sys.argv 가 주어진 경우 loop 옵션을 비활성화 (주석으로 비활성화 가능)
     if len(sys.argv)>1: self.log = 2              # sys.argv 가 주어진 경우 log=2 를 활성화시킵니다. (주석으로 비활성화 가능)
     if len(sys.argv)>1: self.exitmessage = False  # sys.argv 가 주어진 경우 종료메세지를 출력하지 않습니다. (주석으로 비활성화 가능)
