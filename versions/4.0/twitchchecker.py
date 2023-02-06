@@ -18,7 +18,7 @@ class twitchchecker():
     self.location = 0                        # 0: 실행 위치 # 1: 프로그램 위치
     self.files = 0                           # 0: GUI # 1: 작업 경로 # 2: 하위 작업 경로 포함 # sys.argv 가 존재한다면 우선 실행
     self.log = 2                             # 0: 출력만 # 1:단일 로그 # 2: 대상 파일별 로그 (log=2 인 경우, 기존에 온전한 로그파일이 있다면 자동으로 건너뜀)
-    self.log1_name = "twitchchecker.txt"     # 단일 로그 파일명 (datetime 포멧을 사용가능, ex: %Y %m %d %H %M %S)
+    self.log1_name = "twitchchecker.txt"     # 단일 로그 파일명 (datetime 포멧을 사용하여 동적인 파일명으로 로깅가능, ex: %Y %m %d %H %M %S)
     self.log1_mode = "wt"                    # 단일 로그 파일 모드 (log1_name 이 정적인 경우 덮어쓸지 이어쓸지 여부, wt: 덮어쓰기 / at: 이어쓰기)
     self.log2_slug = ".txt"                  # 다중 로그 확장자
 
@@ -30,6 +30,8 @@ class twitchchecker():
     self.log2_force = False                  # 온전한 log2 파일이 있어도 강제로 검사 (로그 파일이 있더라도 재검사가 필요한 경우는 재검사하니 굳이 건들지 마세요)
     self.loop = False                        # 루프 옵션
     self.loop_delay = 60                     # 루프 딜레이 (loop가 True 이며 files가 1 또는 2 인 경우 해당 딜레이 이후 다시 실행)
+    self.exitmessage = True                  # 검사 종료시 enter 메세지가 뜨게 할지 여부 (로그 파일만 남기는게 목적이라면 False로)
+    self.utc = 9                             # 시간 기준입니다. 한국은 UTC+9 니다.
     if len(sys.argv)>1: self.loop = False    # sys.argv 가 주어진 경우 loop 옵션을 비활성화 (주석으로 비활성화 가능)
     if self.loop: self.log = 2               # loop 가 활성화 된 경우 log=2 를 활성화 (주석으로 비활성화 가능)
 
@@ -130,8 +132,19 @@ class twitchchecker():
         file_handler.terminator = ""
         logger.addHandler(file_handler)
       for filename in filenames:
+        with open(filename,"rb") as fp:
+          if not re.search("index-\d{10}.ts",str(fp.read(1880))):
+            continue
+          size = fp.seek(0,2)
+          sizefmt = format(size,',')
+        logname = filename[:filename.rfind(".")]+self.log2_slug
+        if not self.log2_force and os.path.isfile(logname):
+          with open(logname,"rt",encoding="utf8") as fp_log:
+            fpdata = fp_log.read()
+            if re.search(f"- 로딩완료 : {sizefmt}\/{sizefmt} \(100\.00%\)",fpdata) or re.search(f"- 에러발생 : [\d\,]*\/{sizefmt}",fpdata):
+              logger.debug(f"* [pass] {os.path.basename(filename)} ({sizefmt})\n")
+              continue
         try:
-          logname = filename[:filename.rfind(".")]+self.log2_slug
           if self.log==2:
             file_handler = logging.FileHandler(logname,"wt","utf8")
             file_handler.setFormatter(formatter)
@@ -139,18 +152,8 @@ class twitchchecker():
             file_handler.terminator = ""
             logger.addHandler(file_handler)
           with open(filename,"rb") as fp:
-            if not re.search("index-\d{10}.ts",str(fp.read(1880))):
-              continue
-            size = fp.seek(0,2)
-            sizefmt = format(size,',')
-            if not self.log2_force:
-              if os.path.isfile(logname):
-                with open(logname,"rt",encoding="utf8") as fp_log:
-                  if f"{sizefmt}/{sizefmt} (100.00%)" in fp_log.read():
-                    continue
             runcounter = time.perf_counter()
             self.title(f"[TwitchChecker] {os.path.basename(filename)}")
-            fp.seek(0,0)
             segment = []
             index = []
             error = 0
@@ -170,7 +173,7 @@ class twitchchecker():
                     logger.debug(f"- 로딩중   : {format(fp.tell(),',')}/{format(size,',')} ({fp.tell()*100/size:.2f}%)\r")
                     regex = re.search("20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}",str(packet))
                     if regex:
-                      timestamp = datetime.datetime.strptime(regex.group(),"%Y-%m-%dT%H:%M:%S")+datetime.timedelta(hours=9)
+                      timestamp = datetime.datetime.strptime(regex.group(),"%Y-%m-%dT%H:%M:%S")+datetime.timedelta(hours=self.utc)
                       segment.append({'index':int(packet[i+6:i+16]),'timestamp':timestamp})
               else:
                 index = list(map(lambda x:x['index'],segment))
@@ -216,7 +219,8 @@ class twitchchecker():
           logger.debug(f"* 루프 기다리는 중 ({self.loop_delay}초)\n\n")
           time.sleep(self.loop_delay)
       else:
-        input('press enter to exit')
+        if self.exitmessage:
+          input('press enter to exit')
 
 if __name__=="__main__":
   twitchchecker()
